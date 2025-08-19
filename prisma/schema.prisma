@@ -1,0 +1,147 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  engineType = "binary"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Doctor model
+model Doctor {
+  id            String         @id @default(uuid())
+  email         String         @unique
+  passwordHash  String
+  clinicName    String
+  specialty     String?
+  phone         String?
+  address       String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  
+  // Subscription fields
+  trialEndsAt   DateTime?
+  subscriptionStatus String?
+  stripeCustomerId String?
+  
+  // Relations
+  patients      Patient[]
+  appointments  Appointment[]
+  visitNotes    VisitNote[]
+  invoices      Invoice[]
+}
+
+// Patient model
+model Patient {
+  id              String        @id @default(uuid())
+  doctorId        String
+  firstName       String
+  lastName        String
+  dob             DateTime
+  phone           String?
+  email           String?
+  address         String?
+  emergencyContact String?
+  medicalHistory  String?
+  allergies       String?
+  medications     String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  
+  // Relations
+  doctor          Doctor        @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  appointments    Appointment[]
+  visitNotes      VisitNote[]
+  invoices        Invoice[]
+  
+  @@index([doctorId])
+}
+
+// Appointment model
+model Appointment {
+  id              String        @id @default(uuid())
+  doctorId        String
+  patientId       String
+  appointmentDate DateTime
+  startTime       DateTime
+  endTime         DateTime
+  type            String
+  status          String        // Scheduled, Completed, Cancelled, No-Show
+  notes           String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  
+  // Relations
+  doctor          Doctor        @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  patient         Patient       @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  visitNote       VisitNote?
+  
+  @@index([doctorId])
+  @@index([patientId])
+}
+
+// Visit Note model
+model VisitNote {
+  id              String        @id @default(uuid())
+  appointmentId   String        @unique
+  doctorId        String
+  patientId       String
+  symptoms        String?
+  diagnosis       String?
+  treatment       String?
+  notes           String?
+  visitDate       DateTime
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  
+  // Relations
+  appointment     Appointment   @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  doctor          Doctor        @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  patient         Patient       @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  
+  @@index([doctorId])
+  @@index([patientId])
+}
+
+// Invoice model
+model Invoice {
+  id              String        @id @default(uuid())
+  doctorId        String
+  patientId       String
+  invoiceNumber   String        @unique
+  amount          Float
+  status          String        // Draft, Sent, Paid, Overdue
+  dueDate         DateTime
+  items           Json
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  
+  // Relations
+  doctor          Doctor        @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  patient         Patient       @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  payments        Payment[]
+  
+  @@index([doctorId])
+  @@index([patientId])
+}
+
+// Payment model
+model Payment {
+  id              String        @id @default(uuid())
+  invoiceId       String
+  amount          Float
+  paymentDate     DateTime
+  paymentMethod   String
+  notes           String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  
+  // Relations
+  invoice         Invoice       @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  
+  @@index([invoiceId])
+}
