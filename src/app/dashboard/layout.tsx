@@ -1,41 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { usePathname, useSearchParams, useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { signOut } from "next-auth/react";
-
-// Simple guest mode implementation
-function useGuestMode() {
-  const [isGuest, setIsGuest] = useState(false);
-  const searchParams = useSearchParams();
-  const router = useRouter();
-
-  useEffect(() => {
-    // Check URL parameter
-    const guestParam = searchParams?.get("guest");
-    
-    // Check sessionStorage
-    const storedGuestMode = typeof window !== 'undefined' ? sessionStorage.getItem("guestMode") : null;
-    
-    if (guestParam === "true" || storedGuestMode === "true") {
-      setIsGuest(true);
-      if (typeof window !== 'undefined') {
-        sessionStorage.setItem("guestMode", "true");
-      }
-    }
-  }, [searchParams]);
-
-  const exitGuestMode = () => {
-    setIsGuest(false);
-    if (typeof window !== 'undefined') {
-      sessionStorage.removeItem("guestMode");
-    }
-    router.push('/login');
-  };
-
-  return { isGuest, exitGuestMode };
-}
+import { useGuestMode } from "@/lib/GuestContext";
 
 export default function DashboardLayout({
   children,
@@ -49,11 +18,8 @@ export default function DashboardLayout({
 
   // Redirect to login if not in guest mode
   useEffect(() => {
-    // Check if we're in guest mode from sessionStorage first
-    const storedGuestMode = typeof window !== 'undefined' ? sessionStorage.getItem("guestMode") : null;
-    
     // If we're in guest mode, don't check authentication
-    if (storedGuestMode === "true" || isGuest) {
+    if (isGuest) {
       return;
     }
     

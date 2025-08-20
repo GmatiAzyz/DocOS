@@ -39,7 +39,7 @@ export default function LoginPage() {
   
   const handleGuestAccess = () => {
     if (typeof window !== 'undefined') {
-      sessionStorage.setItem("guestMode", "true");
+      localStorage.setItem("guestMode", "true");
     }
     router.push('/dashboard?guest=true');
   };

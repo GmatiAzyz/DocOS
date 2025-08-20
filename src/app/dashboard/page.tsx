@@ -2,69 +2,126 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { LoadingSpinner, LoadingCard, LoadingSkeleton } from "@/components/ui/LoadingSpinner";
+import { DashboardStats, Appointment, Activity } from "@/types/dashboard";
 
 export default function Dashboard() {
-  // Mock data for the dashboard
-  const [stats, setStats] = useState({
+  const [stats, setStats] = useState<DashboardStats>({
     totalPatients: 0,
     appointmentsThisWeek: 0,
     pendingInvoices: 0,
   });
 
-  const [todayAppointments, setTodayAppointments] = useState([
-    {
-      id: "1",
-      patientName: "John Smith",
-      time: "9:00 AM",
-      type: "Check-up",
-      status: "Scheduled",
-    },
-    {
-      id: "2",
-      patientName: "Sarah Johnson",
-      time: "10:30 AM",
-      type: "Follow-up",
-      status: "Scheduled",
-    },
-    {
-      id: "3",
-      patientName: "Michael Brown",
-      time: "1:15 PM",
-      type: "Consultation",
-      status: "Scheduled",
-    },
-  ]);
-
-  const [recentActivity, setRecentActivity] = useState([
-    {
-      id: "1",
-      type: "New Patient",
-      description: "Emily Wilson registered as a new patient",
-      time: "2 hours ago",
-    },
-    {
-      id: "2",
-      type: "Completed Visit",
-      description: "Completed check-up with Robert Davis",
-      time: "Yesterday",
-    },
-    {
-      id: "3",
-      type: "Invoice Paid",
-      description: "Invoice #1234 paid by Jennifer Lee",
-      time: "Yesterday",
-    },
-  ]);
+  const [todayAppointments, setTodayAppointments] = useState<Appointment[]>([]);
+  const [recentActivity, setRecentActivity] = useState<Activity[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   // Simulate loading data
   useEffect(() => {
-    // In a real app, this would be an API call
-    setStats({
-      totalPatients: 42,
-      appointmentsThisWeek: 15,
-      pendingInvoices: 7,
-    });
+    const loadDashboardData = async () => {
+      try {
+        setLoading(true);
+        // Simulate API call delay
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        setStats({
+          totalPatients: 42,
+          appointmentsThisWeek: 15,
+          pendingInvoices: 7,
+        });
+
+        setTodayAppointments([
+          {
+            id: "1",
+            patientName: "John Smith",
+            time: "9:00 AM",
+            type: "Check-up",
+            status: "Scheduled",
+          },
+          {
+            id: "2",
+            patientName: "Sarah Johnson",
+            time: "10:30 AM",
+            type: "Follow-up",
+            status: "Scheduled",
+          },
+          {
+            id: "3",
+            patientName: "Michael Brown",
+            time: "1:15 PM",
+            type: "Consultation",
+            status: "Scheduled",
+          },
+        ]);
+
+        setRecentActivity([
+          {
+            id: "1",
+            type: "New Patient",
+            description: "Emily Wilson registered as a new patient",
+            time: "2 hours ago",
+          },
+          {
+            id: "2",
+            type: "Completed Visit",
+            description: "Completed check-up with Robert Davis",
+            time: "Yesterday",
+          },
+          {
+            id: "3",
+            type: "Invoice Paid",
+            description: "Invoice #1234 paid by Jennifer Lee",
+            time: "Yesterday",
+          },
+        ]);
+      } catch (err) {
+        setError("Failed to load dashboard data");
+        console.error("Dashboard loading error:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadDashboardData();
   }, []);
+
+  if (loading) {
+    return (
+      <div>
+        <h1 className="text-2xl font-semibold text-gray-900">Dashboard</h1>
+        <div className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          {[1, 2, 3].map((i) => (
+            <LoadingCard key={i} />
+          ))}
+        </div>
+        <div className="mt-8">
+          <LoadingSkeleton className="h-6 w-32 mb-4" />
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {[1, 2, 3].map((i) => (
+              <LoadingCard key={i} />
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-center py-12">
+        <div className="text-red-500 text-6xl mb-4">⚠️</div>
+        <h2 className="text-xl font-semibold text-gray-900 mb-2">Failed to load dashboard</h2>
+        <p className="text-gray-600 mb-4">{error}</p>
+        <button
+          onClick={() => window.location.reload()}
+          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          Try Again
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -215,39 +272,45 @@ export default function Dashboard() {
       <div className="mt-8">
         <h2 className="text-lg font-medium text-gray-900">Today's Appointments</h2>
         <div className="mt-2 bg-white shadow overflow-hidden sm:rounded-md">
-          <ul className="divide-y divide-gray-200">
-            {todayAppointments.map((appointment) => (
-              <li key={appointment.id}>
-                <div className="px-4 py-4 sm:px-6">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <p className="text-sm font-medium text-blue-600 truncate">{appointment.patientName}</p>
-                      <p className="ml-2 flex-shrink-0 inline-block px-2 py-0.5 text-xs font-medium rounded-full bg-green-100 text-green-800">
-                        {appointment.status}
-                      </p>
+          {todayAppointments.length === 0 ? (
+            <div className="px-4 py-8 text-center text-gray-500">
+              No appointments scheduled for today
+            </div>
+          ) : (
+            <ul className="divide-y divide-gray-200">
+              {todayAppointments.map((appointment) => (
+                <li key={appointment.id}>
+                  <div className="px-4 py-4 sm:px-6">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center">
+                        <p className="text-sm font-medium text-blue-600 truncate">{appointment.patientName}</p>
+                        <p className="ml-2 flex-shrink-0 inline-block px-2 py-0.5 text-xs font-medium rounded-full bg-green-100 text-green-800">
+                          {appointment.status}
+                        </p>
+                      </div>
+                      <div className="ml-2 flex-shrink-0 flex">
+                        <p className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                          {appointment.time}
+                        </p>
+                      </div>
                     </div>
-                    <div className="ml-2 flex-shrink-0 flex">
-                      <p className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
-                        {appointment.time}
-                      </p>
+                    <div className="mt-2 sm:flex sm:justify-between">
+                      <div className="sm:flex">
+                        <p className="flex items-center text-sm text-gray-500">
+                          {appointment.type}
+                        </p>
+                      </div>
+                      <div className="mt-2 flex items-center text-sm text-gray-500 sm:mt-0">
+                        <Link href={`/dashboard/appointments/${appointment.id}`} className="font-medium text-blue-600 hover:text-blue-500">
+                          View details
+                        </Link>
+                      </div>
                     </div>
                   </div>
-                  <div className="mt-2 sm:flex sm:justify-between">
-                    <div className="sm:flex">
-                      <p className="flex items-center text-sm text-gray-500">
-                        {appointment.type}
-                      </p>
-                    </div>
-                    <div className="mt-2 flex items-center text-sm text-gray-500 sm:mt-0">
-                      <Link href={`/dashboard/appointments/${appointment.id}`} className="font-medium text-blue-600 hover:text-blue-500">
-                        View details
-                      </Link>
-                    </div>
-                  </div>
-                </div>
-              </li>
-            ))}
-          </ul>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       </div>
 
@@ -255,29 +318,35 @@ export default function Dashboard() {
       <div className="mt-8">
         <h2 className="text-lg font-medium text-gray-900">Recent Activity</h2>
         <div className="mt-2 bg-white shadow overflow-hidden sm:rounded-md">
-          <ul className="divide-y divide-gray-200">
-            {recentActivity.map((activity) => (
-              <li key={activity.id}>
-                <div className="px-4 py-4 sm:px-6">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-medium text-blue-600 truncate">{activity.type}</p>
-                    <div className="ml-2 flex-shrink-0 flex">
-                      <p className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
-                        {activity.time}
-                      </p>
+          {recentActivity.length === 0 ? (
+            <div className="px-4 py-8 text-center text-gray-500">
+              No recent activity
+            </div>
+          ) : (
+            <ul className="divide-y divide-gray-200">
+              {recentActivity.map((activity) => (
+                <li key={activity.id}>
+                  <div className="px-4 py-4 sm:px-6">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium text-blue-600 truncate">{activity.type}</p>
+                      <div className="ml-2 flex-shrink-0 flex">
+                        <p className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
+                          {activity.time}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mt-2 sm:flex sm:justify-between">
+                      <div className="sm:flex">
+                        <p className="flex items-center text-sm text-gray-500">
+                          {activity.description}
+                        </p>
+                      </div>
                     </div>
                   </div>
-                  <div className="mt-2 sm:flex sm:justify-between">
-                    <div className="sm:flex">
-                      <p className="flex items-center text-sm text-gray-500">
-                        {activity.description}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </li>
-            ))}
-          </ul>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       </div>
     </div>
