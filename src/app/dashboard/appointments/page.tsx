@@ -41,35 +41,57 @@ export default function AppointmentsPage() {
   useEffect(() => {
     const fetchAppointments = async () => {
       try {
+        console.log("Fetching appointments...");
         const response = await fetch("/api/appointments");
+        console.log("Response status:", response.status);
+        
         if (!response.ok) {
-          throw new Error("Failed to fetch appointments");
+          const errorText = await response.text();
+          console.error("Response not ok:", response.status, errorText);
+          throw new Error(`Failed to fetch appointments: ${response.status} ${errorText}`);
         }
+        
         const data = await response.json();
+        console.log("Appointments data:", data);
         setAppointments(data);
         
         // Convert appointments to calendar events
         const calendarEvents = data.map((appointment: Appointment) => {
-          const [year, month, day] = appointment.appointmentDate.split("-").map(Number);
-          const [startHour, startMinute] = appointment.startTime.split(":").map(Number);
-          const [endHour, endMinute] = appointment.endTime.split(":").map(Number);
-          
-          const start = new Date(year, month - 1, day, startHour, startMinute);
-          const end = new Date(year, month - 1, day, endHour, endMinute);
-          
-          return {
-            id: appointment.id,
-            title: `${appointment.patientName} - ${appointment.type}`,
-            start,
-            end,
-            status: appointment.status,
-            resource: appointment,
-          };
-        });
+          try {
+            const [year, month, day] = appointment.appointmentDate.split("-").map(Number);
+            const [startHour, startMinute] = appointment.startTime.split(":").map(Number);
+            const [endHour, endMinute] = appointment.endTime.split(":").map(Number);
+            
+            const start = new Date(year, month - 1, day, startHour, startMinute);
+            const end = new Date(year, month - 1, day, endHour, endMinute);
+            
+            // Validate dates
+            if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+              console.warn("Invalid date for appointment:", appointment);
+              return null;
+            }
+            
+            return {
+              id: appointment.id,
+              title: `${appointment.patientName} - ${appointment.type}`,
+              start,
+              end,
+              status: appointment.status,
+              resource: appointment,
+            };
+          } catch (error) {
+            console.warn("Error processing appointment:", appointment, error);
+            return null;
+          }
+        }).filter(Boolean); // Remove any null events
         
+        console.log("Calendar events:", calendarEvents);
         setEvents(calendarEvents);
       } catch (error) {
         console.error("Error fetching appointments:", error);
+        // Set empty arrays on error to prevent UI issues
+        setAppointments([]);
+        setEvents([]);
       } finally {
         setLoading(false);
       }

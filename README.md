@@ -75,6 +75,49 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000) in your browser.
 
+## 🐳 Docker Development
+
+### Using Docker Compose (Recommended)
+```bash
+# Start all services
+docker-compose up -d
+
+# View logs
+docker-compose logs -f app
+
+# Stop services
+docker-compose down
+```
+
+### Manual Docker
+```bash
+# Build and run
+npm run docker:build
+npm run docker:run
+
+# View logs
+npm run docker:logs
+
+# Stop container
+npm run docker:stop
+```
+
+## 🚀 Production Deployment
+
+For production deployment, see [PRODUCTION.md](./PRODUCTION.md) for detailed instructions.
+
+### Quick Production Commands
+```bash
+# Build production image
+docker build -t docos:production .
+
+# Run production container
+docker run -d --name docos-production -p 3000:3000 --env-file .env.production docos:production
+
+# Health check
+npm run health
+```
+
 ## 🔧 Configuration
 
 ### Database Setup

@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: docos_postgres
+    environment:
+      POSTGRES_DB: docos_db
+      POSTGRES_USER: docos_user
+      POSTGRES_PASSWORD: docos_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./prisma/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U docos_user -d docos_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis (for caching and sessions in production)
+  redis:
+    image: redis:7-alpine
+    container_name: docos_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Application (development)
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: docos_app
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=postgresql://docos_user:docos_password@postgres:5432/docos_db
+      - REDIS_URL=redis://redis:6379
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: npm run dev
+
+volumes:
+  postgres_data:
+  redis_data:

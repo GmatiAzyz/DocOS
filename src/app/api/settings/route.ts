@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { authOptions } from "@/lib/auth";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 
 // Mock doctor data
 const mockDoctor = {

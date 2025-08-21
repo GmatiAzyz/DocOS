@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import prisma from "@/lib/prisma";
 
 // POST /api/invoices/[id]/payments - Add a payment to an invoice
@@ -69,7 +69,7 @@ export async function POST(
     
     // Determine new invoice status
     let newStatus = invoice.status;
-    if (totalPaid >= invoice.totalAmount) {
+    if (totalPaid >= invoice.amount) {
       newStatus = "PAID";
     } else if (totalPaid > 0) {
       newStatus = "PARTIALLY_PAID";

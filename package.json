@@ -7,7 +7,16 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "setup": "node setup.js"
+    "setup": "node setup.js",
+    "docker:build": "docker build -t docos:latest .",
+    "docker:run": "docker run -d --name docos-app -p 3000:3000 --env-file .env.local docos:latest",
+    "docker:stop": "docker stop docos-app && docker rm docos-app",
+    "docker:logs": "docker logs -f docos-app",
+    "db:push": "prisma db push",
+    "db:generate": "prisma generate",
+    "db:studio": "prisma studio",
+    "db:reset": "prisma db push --force-reset",
+    "health": "curl -f http://localhost:3000/api/health || echo 'Health check failed'"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.10.0",
@@ -20,6 +29,7 @@
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "jspdf": "^3.0.1",
+    "moment": "^2.30.1",
     "next": "15.4.7",
     "next-auth": "^4.24.11",
     "prisma": "^6.14.0",
