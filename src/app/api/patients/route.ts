@@ -16,25 +16,58 @@ export async function GET(req: NextRequest) {
 
     const doctorId = session.user.id;
     
-    const patients = await prisma.patient.findMany({
-      where: {
-        doctorId: doctorId,
-      },
-      orderBy: {
-        lastName: 'asc',
-      },
-      select: {
-        id: true,
-        firstName: true,
-        lastName: true,
-        email: true,
-        phone: true,
-        dob: true,
-        createdAt: true,
-      },
-    });
+    // Parse query parameters for pagination and filtering
+    const { searchParams } = new URL(req.url);
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
+    const limit = Math.min(Math.max(1, parseInt(searchParams.get('limit') || '10', 10)), 100); // Max 100 per page
+    const search = searchParams.get('search');
+    
+    // Build where clause
+    const whereClause: any = { doctorId };
+    
+    if (search) {
+      // Sanitize search input to prevent injection
+      const sanitizedSearch = search.replace(/[^a-zA-Z0-9\s@.-]/g, '');
+      
+      whereClause.OR = [
+        { firstName: { contains: sanitizedSearch, mode: 'insensitive' } },
+        { lastName: { contains: sanitizedSearch, mode: 'insensitive' } },
+        { email: { contains: sanitizedSearch, mode: 'insensitive' } },
+        { phone: { contains: sanitizedSearch, mode: 'insensitive' } },
+      ];
+    }
+    
+    // Get patients with pagination
+    const [patients, total] = await Promise.all([
+      prisma.patient.findMany({
+        where: whereClause,
+        orderBy: {
+          lastName: 'asc',
+        },
+        skip: (page - 1) * limit,
+        take: limit,
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          phone: true,
+          dob: true,
+          createdAt: true,
+        },
+      }),
+      prisma.patient.count({ where: whereClause })
+    ]);
 
-    return NextResponse.json(patients);
+    return NextResponse.json({
+      data: patients,
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit),
+      }
+    });
   } catch (error) {
     logError(error, 'PATIENTS_GET');
     return handleError(error);

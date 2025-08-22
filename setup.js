@@ -3,6 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
+const crypto = require('crypto');
 
 console.log('🚀 DocOS Setup Script');
 console.log('=====================\n');
@@ -11,16 +12,43 @@ console.log('=====================\n');
 const envPath = path.join(__dirname, '.env.local');
 if (fs.existsSync(envPath)) {
   console.log('✅ .env.local already exists');
+  
+  // Validate required environment variables
+  const envContent = fs.readFileSync(envPath, 'utf8');
+  const requiredVars = ['NEXTAUTH_SECRET', 'DATABASE_URL'];
+  const missingVars = [];
+  
+  for (const varName of requiredVars) {
+    if (!envContent.includes(varName) || envContent.includes(`=${varName}`)) {
+      missingVars.push(varName);
+    }
+  }
+  
+  if (missingVars.length > 0) {
+    console.log('⚠️  Missing required environment variables:', missingVars.join(', '));
+    console.log('Please edit .env.local with your actual values');
+  } else {
+    console.log('✅ Required environment variables are present');
+  }
 } else {
   console.log('📝 Creating .env.local from template...');
   
   // Read template
   const templatePath = path.join(__dirname, 'env.template');
   if (fs.existsSync(templatePath)) {
-    const template = fs.readFileSync(templatePath, 'utf8');
+    let template = fs.readFileSync(templatePath, 'utf8');
+    
+    // Generate a secure NEXTAUTH_SECRET if not already set
+    const nextAuthSecret = crypto.randomBytes(32).toString('hex');
+    template = template.replace(
+      'NEXTAUTH_SECRET=your-super-secret-key-change-this-in-production',
+      `NEXTAUTH_SECRET=${nextAuthSecret}`
+    );
+    
     fs.writeFileSync(envPath, template);
     console.log('✅ .env.local created from template');
-    console.log('⚠️  Please edit .env.local with your actual values before continuing');
+    console.log('✅ Generated secure NEXTAUTH_SECRET');
+    console.log('⚠️  Please edit .env.local with your actual DATABASE_URL and other values before continuing');
   } else {
     console.log('❌ env.template not found');
     process.exit(1);

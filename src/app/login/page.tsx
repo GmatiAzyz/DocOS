@@ -25,7 +25,7 @@ export default function LoginPage() {
       });
 
       if (result?.error) {
-        setError("Invalid email or password");
+        setError(result.error);
         setLoading(false);
         return;
       }
@@ -39,7 +39,7 @@ export default function LoginPage() {
   
   const handleGuestAccess = () => {
     if (typeof window !== 'undefined') {
-      localStorage.setItem("guestMode", "true");
+      sessionStorage.setItem("guestMode", "true");
     }
     router.push('/dashboard?guest=true');
   };

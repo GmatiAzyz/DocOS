@@ -45,46 +45,72 @@ const mockAppointments = [
 // GET /api/appointments - Get all appointments for the logged-in doctor
 export async function GET(req: NextRequest) {
   try {
-    console.log("GET /api/appointments called");
-    console.log("Database URL exists:", !!process.env.DATABASE_URL);
-    console.log("NEXTAUTH_SECRET exists:", !!process.env.NEXTAUTH_SECRET);
-    console.log("Auth options:", !!authOptions);
-    
-    let session;
-    try {
-      session = await getServerSession(authOptions);
-      console.log("Session:", session);
-    } catch (authError) {
-      console.warn("Authentication error, returning mock data:", authError);
-      return NextResponse.json(mockAppointments);
-    }
+    const session = await getServerSession(authOptions);
     
     // If no session, return mock data (for guest mode)
     if (!session || !session.user.id) {
-      console.log("No session, returning mock data");
       return NextResponse.json(mockAppointments);
     }
 
     const doctorId = session.user.id;
-    console.log("Doctor ID:", doctorId);
-
-    try {
-      // Test database connectivity first
-      console.log("Testing database connectivity...");
-      console.log("Prisma client:", !!prisma);
-      
-      if (!prisma) {
-        console.warn("Prisma client not available, returning mock data");
-        return NextResponse.json(mockAppointments);
+    
+    // Parse query parameters for pagination and filtering
+    const { searchParams } = new URL(req.url);
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
+    const limit = Math.min(Math.max(1, parseInt(searchParams.get('limit') || '10', 10)), 100); // Max 100 per page
+    const status = searchParams.get('status');
+    const dateFrom = searchParams.get('dateFrom');
+    const dateTo = searchParams.get('dateTo');
+    
+    // Validate status parameter
+    const validStatuses = ['scheduled', 'completed', 'cancelled', 'no-show'];
+    if (status && !validStatuses.includes(status)) {
+      return NextResponse.json(
+        { error: 'Invalid status parameter' },
+        { status: 400 }
+      );
+    }
+    
+    // Build where clause
+    const whereClause: any = { doctorId };
+    
+    if (status) {
+      whereClause.status = status;
+    }
+    
+    if (dateFrom || dateTo) {
+      whereClause.appointmentDate = {};
+      if (dateFrom) {
+        const fromDate = new Date(dateFrom);
+        // Validate date
+        if (isNaN(fromDate.getTime())) {
+          return NextResponse.json(
+            { error: 'Invalid dateFrom parameter' },
+            { status: 400 }
+          );
+        }
+        whereClause.appointmentDate.gte = fromDate;
       }
-      
-      await prisma.$queryRaw`SELECT 1`;
-      console.log("Database connection successful");
-      
-      // Try to get appointments from database
-      const appointments = await prisma.appointment.findMany({
-        where: { doctorId },
+      if (dateTo) {
+        const toDate = new Date(dateTo);
+        // Validate date
+        if (isNaN(toDate.getTime())) {
+          return NextResponse.json(
+            { error: 'Invalid dateTo parameter' },
+            { status: 400 }
+          );
+        }
+        whereClause.appointmentDate.lte = toDate;
+      }
+    }
+    
+    // Get appointments with pagination
+    const [appointments, total] = await Promise.all([
+      prisma.appointment.findMany({
+        where: whereClause,
         orderBy: { appointmentDate: "asc" },
+        skip: (page - 1) * limit,
+        take: limit,
         include: {
           patient: {
             select: {
@@ -96,50 +122,32 @@ export async function GET(req: NextRequest) {
             },
           },
         },
-      });
+      }),
+      prisma.appointment.count({ where: whereClause })
+    ]);
 
-      console.log("Found appointments in database:", appointments.length);
+    // Transform database appointments to match frontend expected format
+    const transformedAppointments = appointments.map(appointment => ({
+      id: appointment.id,
+      patientId: appointment.patientId,
+      patientName: `${appointment.patient.firstName} ${appointment.patient.lastName}`,
+      appointmentDate: appointment.appointmentDate.toISOString().split('T')[0],
+      startTime: appointment.startTime,
+      endTime: appointment.endTime,
+      type: appointment.type,
+      status: appointment.status,
+      notes: appointment.notes || "",
+    }));
 
-      // Transform database appointments to match frontend expected format
-      const transformedAppointments = appointments.map(appointment => ({
-        id: appointment.id,
-        patientId: appointment.patientId,
-        patientName: `${appointment.patient.firstName} ${appointment.patient.lastName}`,
-        appointmentDate: appointment.appointmentDate.toISOString().split('T')[0],
-        startTime: appointment.startTime,
-        endTime: appointment.endTime,
-        type: appointment.type,
-        status: appointment.status,
-        notes: appointment.notes || "",
-      }));
-
-      return NextResponse.json(transformedAppointments);
-    } catch (dbError) {
-      // If database fails, fall back to mock data
-      console.warn("Database error, falling back to mock data:", dbError);
-      console.error("Database error details:", {
-        message: dbError instanceof Error ? dbError.message : String(dbError),
-        stack: dbError instanceof Error ? dbError.stack : undefined,
-        name: dbError instanceof Error ? dbError.name : undefined
-      });
-      
-      // Check if it's a table doesn't exist error
-      if (dbError instanceof Error && dbError.message.includes("doesn't exist")) {
-        console.log("Database tables don't exist, returning mock data");
+    return NextResponse.json({
+      data: transformedAppointments,
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit),
       }
-      
-      // Check if it's a connection error
-      if (dbError instanceof Error && (
-        dbError.message.includes("connect") || 
-        dbError.message.includes("connection") ||
-        dbError.message.includes("ECONNREFUSED") ||
-        dbError.message.includes("ENOTFOUND")
-      )) {
-        console.log("Database connection failed, returning mock data");
-      }
-      
-      return NextResponse.json(mockAppointments);
-    }
+    });
   } catch (error) {
     logError(error, 'APPOINTMENTS_GET');
     return handleError(error);

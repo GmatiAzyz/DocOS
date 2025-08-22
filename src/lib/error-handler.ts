@@ -56,8 +56,20 @@ export class ConflictError extends Error implements AppError {
   }
 }
 
+// Custom error for rate limiting
+export class RateLimitError extends Error implements AppError {
+  statusCode = 429;
+  code = 'RATE_LIMIT_EXCEEDED';
+  
+  constructor(message: string = 'Too many requests') {
+    super(message);
+    this.name = 'RateLimitError';
+  }
+}
+
 export function handleError(error: unknown): NextResponse {
-  console.error('API Error:', error);
+  // Log the error with structured logging
+  logError(error, 'API_ERROR_HANDLER');
   
   // Handle known application errors
   if (error instanceof ValidationError) {
@@ -66,6 +78,7 @@ export function handleError(error: unknown): NextResponse {
         error: error.message,
         code: error.code,
         details: error.details,
+        timestamp: new Date().toISOString(),
       },
       { status: error.statusCode }
     );
@@ -76,6 +89,7 @@ export function handleError(error: unknown): NextResponse {
       {
         error: error.message,
         code: error.code,
+        timestamp: new Date().toISOString(),
       },
       { status: error.statusCode }
     );
@@ -86,6 +100,7 @@ export function handleError(error: unknown): NextResponse {
       {
         error: error.message,
         code: error.code,
+        timestamp: new Date().toISOString(),
       },
       { status: error.statusCode }
     );
@@ -96,6 +111,7 @@ export function handleError(error: unknown): NextResponse {
       {
         error: error.message,
         code: error.code,
+        timestamp: new Date().toISOString(),
       },
       { status: error.statusCode }
     );
@@ -106,6 +122,18 @@ export function handleError(error: unknown): NextResponse {
       {
         error: error.message,
         code: error.code,
+        timestamp: new Date().toISOString(),
+      },
+      { status: error.statusCode }
+    );
+  }
+  
+  if (error instanceof RateLimitError) {
+    return NextResponse.json(
+      {
+        error: error.message,
+        code: error.code,
+        timestamp: new Date().toISOString(),
       },
       { status: error.statusCode }
     );
@@ -121,6 +149,7 @@ export function handleError(error: unknown): NextResponse {
           {
             error: 'A record with this information already exists',
             code: 'DUPLICATE_ENTRY',
+            timestamp: new Date().toISOString(),
           },
           { status: 409 }
         );
@@ -129,6 +158,7 @@ export function handleError(error: unknown): NextResponse {
           {
             error: 'Record not found',
             code: 'NOT_FOUND',
+            timestamp: new Date().toISOString(),
           },
           { status: 404 }
         );
@@ -137,6 +167,7 @@ export function handleError(error: unknown): NextResponse {
           {
             error: 'Invalid reference',
             code: 'INVALID_REFERENCE',
+            timestamp: new Date().toISOString(),
           },
           { status: 400 }
         );
@@ -150,6 +181,7 @@ export function handleError(error: unknown): NextResponse {
     {
       error: isDevelopment ? (error as Error)?.message || 'Internal server error' : 'Internal server error',
       code: 'INTERNAL_ERROR',
+      timestamp: new Date().toISOString(),
       ...(isDevelopment && { stack: (error as Error)?.stack }),
     },
     { status: 500 }
@@ -159,11 +191,31 @@ export function handleError(error: unknown): NextResponse {
 export function logError(error: unknown, context?: string): void {
   const errorMessage = error instanceof Error ? error.message : String(error);
   const errorStack = error instanceof Error ? error.stack : undefined;
+  const errorName = error instanceof Error ? error.name : 'UnknownError';
   
-  console.error(`[${context || 'APP'}] Error:`, {
+  // Structured logging
+  const logEntry = {
+    level: 'error',
     message: errorMessage,
+    name: errorName,
     stack: errorStack,
+    context: context || 'APP',
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV,
-  });
+    // Add request ID if available in future
+  };
+  
+  // In production, you might want to send this to a logging service
+  if (process.env.NODE_ENV === 'production') {
+    // Example: send to external logging service
+    // await sendToLoggingService(logEntry);
+    console.error(JSON.stringify(logEntry));
+  } else {
+    console.error(`[${context || 'APP'}] ${errorName}:`, {
+      message: errorMessage,
+      stack: errorStack,
+      timestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV,
+    });
+  }
 }

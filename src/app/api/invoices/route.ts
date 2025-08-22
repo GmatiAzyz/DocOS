@@ -14,34 +14,64 @@ export async function GET(req: NextRequest) {
 
     const doctorId = session.user.id;
     
-    const invoices = await prisma.invoice.findMany({
-      where: {
-        doctorId: doctorId,
-      },
-      include: {
-        patient: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
+    // Parse query parameters for pagination and filtering
+    const { searchParams } = new URL(req.url);
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
+    const limit = Math.min(Math.max(1, parseInt(searchParams.get('limit') || '10', 10)), 100);
+    const status = searchParams.get('status');
+    const patientId = searchParams.get('patientId');
+    
+    // Build where clause
+    const whereClause: any = { doctorId };
+    
+    if (status) {
+      whereClause.status = status.toUpperCase();
+    }
+    
+    if (patientId) {
+      whereClause.patientId = patientId;
+    }
+    
+    // Get invoices with pagination
+    const [invoices, total] = await Promise.all([
+      prisma.invoice.findMany({
+        where: whereClause,
+        include: {
+          patient: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+            },
+          },
+          payments: {
+            select: {
+              id: true,
+              amount: true,
+              paymentDate: true,
+              paymentMethod: true,
+            },
           },
         },
-        payments: {
-          select: {
-            id: true,
-            amount: true,
-            paymentDate: true,
-            method: true,
-          },
+        orderBy: {
+          createdAt: "desc",
         },
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
-    });
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      prisma.invoice.count({ where: whereClause })
+    ]);
 
-    return NextResponse.json(invoices);
+    return NextResponse.json({
+      data: invoices,
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit),
+      }
+    });
   } catch (error) {
     console.error("Error fetching invoices:", error);
     return NextResponse.json(
@@ -98,12 +128,10 @@ export async function POST(req: NextRequest) {
         doctorId: doctorId,
         patientId: data.patientId,
         invoiceNumber: data.invoiceNumber,
-        issueDate: new Date(),
         dueDate: new Date(data.dueDate),
-        totalAmount: totalAmount,
-        status: "PENDING",
+        amount: totalAmount,
+        status: "Draft",
         items: data.items,
-        notes: data.notes || null,
       },
     });
 

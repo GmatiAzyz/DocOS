@@ -21,6 +21,17 @@ if [ -z "$NEXTAUTH_URL" ]; then
     exit 1
 fi
 
+# Validate database URL format
+if [[ ! "$PRODUCTION_DATABASE_URL" =~ ^postgresql:// ]]; then
+    echo "❌ PRODUCTION_DATABASE_URL must be a PostgreSQL URL"
+    exit 1
+fi
+
+# Validate NEXTAUTH_URL format
+if [[ ! "$NEXTAUTH_URL" =~ ^https:// ]]; then
+    echo "⚠️  NEXTAUTH_URL should be HTTPS in production"
+fi
+
 # Build the application
 echo "📦 Building application..."
 npm run build

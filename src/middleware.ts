@@ -1,11 +1,13 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { RateLimitError } from '@/lib/error-handler';
 
 // Simple in-memory rate limiting (for production, use Redis or similar)
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
 
-const RATE_LIMIT_WINDOW = 60 * 1000; // 1 minute
-const MAX_REQUESTS = 100; // Max requests per window
+// Get rate limit from environment or use default
+const RATE_LIMIT_WINDOW = parseInt(process.env.RATE_LIMIT_WINDOW || '60000'); // 1 minute
+const MAX_REQUESTS = parseInt(process.env.API_RATE_LIMIT || '100'); // Max requests per window
 
 function isRateLimited(ip: string): boolean {
   const now = Date.now();
@@ -24,17 +26,49 @@ function isRateLimited(ip: string): boolean {
   return false;
 }
 
+// Validate origin for CORS
+function isValidOrigin(origin: string | null): boolean {
+  if (!origin) return true; // Allow requests with no origin (mobile apps, curl, etc.)
+  
+  const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [];
+  return allowedOrigins.some(allowed => origin === allowed.trim());
+}
+
 export function middleware(request: NextRequest) {
-  const ip = request.headers.get('x-forwarded-for') || 
-             request.headers.get('x-real-ip') || 
+  const ip = request.headers.get('x-forwarded-for') ||
+             request.headers.get('x-real-ip') ||
              'unknown';
+  
+  // Validate origin for API routes
+  const origin = request.headers.get('origin');
+  if (request.nextUrl.pathname.startsWith('/api/') && origin && !isValidOrigin(origin)) {
+    return new NextResponse(
+      JSON.stringify({
+        error: 'CORS not allowed',
+        code: 'CORS_ERROR',
+        timestamp: new Date().toISOString()
+      }),
+      {
+        status: 403,
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      }
+    );
+  }
   
   // Rate limiting for API routes
   if (request.nextUrl.pathname.startsWith('/api/')) {
     if (isRateLimited(ip)) {
+      // Use the custom RateLimitError class
+      const error = new RateLimitError('Too many requests. Please try again later.');
       return new NextResponse(
-        JSON.stringify({ error: 'Too many requests' }),
-        { 
+        JSON.stringify({
+          error: error.message,
+          code: error.code,
+          timestamp: new Date().toISOString()
+        }),
+        {
           status: 429,
           headers: {
             'Content-Type': 'application/json',

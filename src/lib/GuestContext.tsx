@@ -20,13 +20,14 @@ export function GuestProvider({ children }: { children: ReactNode }) {
     // Check URL parameter first
     const guestParam = searchParams?.get("guest");
     
-    // Check localStorage for persistence
-    const storedGuestMode = typeof window !== 'undefined' ? localStorage.getItem("guestMode") : null;
+    // Check sessionStorage for persistence (more secure than localStorage)
+    const storedGuestMode = typeof window !== 'undefined' ? sessionStorage.getItem("guestMode") : null;
     
+    // Only allow guest mode if explicitly requested
     if (guestParam === "true" || storedGuestMode === "true") {
       setIsGuest(true);
       if (typeof window !== 'undefined') {
-        localStorage.setItem("guestMode", "true");
+        sessionStorage.setItem("guestMode", "true");
       }
     }
   }, [searchParams]);
@@ -34,7 +35,7 @@ export function GuestProvider({ children }: { children: ReactNode }) {
   const exitGuestMode = () => {
     setIsGuest(false);
     if (typeof window !== 'undefined') {
-      localStorage.removeItem("guestMode");
+      sessionStorage.removeItem("guestMode");
     }
     router.push('/login');
   };
